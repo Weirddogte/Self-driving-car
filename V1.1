@@ -1,0 +1,283 @@
+//This is the code for a self driving car.By:Eian, River, and Jonah
+#include <Servo.h>
+#include <AFMotor.h>
+#include <NewPing.h>
+AF_DCMotor motor(1);
+const int ServoPin = 11;
+const int TriggerPin = 10;
+const int EchoPin = 2;
+const int TriggerPin2 = 5;
+const int EchoPin2 = 4;
+const int TriggerPin3 = 6;
+const int EchoPin3 = 7;
+NewPing sonar(TriggerPin, EchoPin, 100);
+NewPing sonar2(TriggerPin2, EchoPin2, 100);
+NewPing sonar3(TriggerPin3, EchoPin3, 100);
+Servo servo;
+int angle = -1;
+int angleright = -1;
+int angleleft = -1;
+int led1 = 13;
+long RightSensor, BackSensor, FrontSensor, LeftSensor;
+int turnLoopCount = 0;
+int isMovingForward = 0;
+void setup() {
+  Serial.begin(9600);
+  servo.attach(ServoPin);
+  //  const int ServoPin = 11;
+  //  const int TriggerPin = 3;
+  //  const int EchoPin = 2;
+  //  const int TriggerPin2 = 5;
+  //  const int EchoPin2 = 4;
+
+  //Setup Channel A
+  pinMode(12, OUTPUT); //Initiates Motor Channel A pin
+  pinMode(9, OUTPUT); //Initiates Brake Channel A pin
+
+  pinMode(TriggerPin, OUTPUT);
+  pinMode(EchoPin, INPUT);
+  pinMode(TriggerPin2, OUTPUT);
+  pinMode(EchoPin2, INPUT);
+  pinMode(TriggerPin3, OUTPUT);
+  pinMode(EchoPin3, INPUT);
+  pinMode(led1, OUTPUT);
+
+}
+
+void loop() {
+  FrontSensor = FindDistance(TriggerPin, EchoPin);
+  RightSensor = FindDistance(TriggerPin2, EchoPin2);
+  LeftSensor = FindDistance(TriggerPin3, EchoPin3);
+  Serial.print(FrontSensor);
+  Serial.print(" F - ");
+  Serial.print(LeftSensor);
+  Serial.print(" L - ");
+  Serial.print(RightSensor);
+  Serial.println(" R");
+
+  if (turnLoopCount > 0) {
+    turnLoopCount = turnLoopCount + 1;
+    if (turnLoopCount > 5) {
+      turnLoopCount = 0;
+    }
+  }
+  ////
+  ProcessFrontSensor();
+
+  if (turnLoopCount == 0 && isMovingForward == 1) {
+
+    ProcessRightSensor();
+    ProcessLeftSensor();
+  }
+  //
+
+
+  //  straight();
+  //  delay(3000);
+  //  TurnRight(45);
+  //  delay(3000);
+  //  TurnLeft(45);
+  //  delay(3000);
+  //  if (RightSensor > 15 && RightSensor < 25 )
+  //  {
+  //  int angle = map(RightSensor, 2, 15, 1, 45);
+  //  servo.write(angle);
+  //  }
+  //delay(250);
+}
+long FindDistance(int trigPinX, int echoPinX)
+{
+  long duration, distance;
+  digitalWrite(trigPinX, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPinX, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinX, LOW);
+  duration = pulseIn(echoPinX, HIGH);
+  distance = (duration / 2) / 29.1;
+  return distance;
+  //int angle = map(distance, 2, 15, 1, 45);
+  //servo.write(angle);
+
+}
+void MoveForward() {
+  //  Serial.println(digitalRead(12));
+  //  Serial.println(digitalRead(9));
+  //  Serial.println(analogRead(3));
+  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+  if (isMovingForward == 0) {
+    digitalWrite(13, HIGH);
+    //digitalWrite(13, LOW);
+    Serial.print(" Moving forward ");
+    Serial.println();
+    isMovingForward = 1;
+    //forward @ full speed
+    digitalWrite(12, HIGH); //Establishes forward direction of Channel A
+    digitalWrite(9, LOW);   //Disengage the Brake for Channel A
+    analogWrite(3, 255);
+    //Spins the motor on Channel A at full speed
+  }
+}
+void straight() {
+  Serial.println("At zero");
+  servo.write(90);
+}
+void turnfront() {
+  int newAngle = map(FrontSensor, 21, 100, 1, 135);
+  Serial.println(newAngle);
+  if (newAngle != angle) {
+    servo.write(newAngle);
+    delay(3000);
+    angle = newAngle;
+  }
+
+}
+void Brakeleds() {
+  digitalWrite(13, HIGH);
+  digitalWrite(13, LOW);
+  digitalWrite(13, HIGH);
+  digitalWrite(13, LOW );
+}
+void Brake() {
+  Serial.print(" Stopping ");
+  Brakeleds();
+  Serial.println();
+  isMovingForward = 1;
+  digitalWrite(9, HIGH);   //Engage the Brake for Channel A
+  straight();
+  delay(2500);
+  Serial.print(" Stopping ");
+  Serial.println();
+  isMovingForward = 0;
+}
+
+void TurnRight(int turnangle) {
+  digitalWrite(13, HIGH);
+  // delay(100);
+  //digitalWrite(13, LOW);
+  Serial.print(" Turning right ");
+  Serial.println();
+  angle = turnangle;
+  servo.write(0);
+  servo.write(30);
+  delay(1150);
+  digitalWrite(13, LOW);
+
+}
+
+void TurnLeft(int turnangle) {
+  digitalWrite(13, HIGH);
+  //delay(100);
+  Serial.print(" Turning left ");
+  Serial.println();
+  angle = turnangle;
+  servo.write(0);
+  servo.write(120);
+  delay(1150);
+  digitalWrite(13, LOW);
+}
+
+void ProcessFrontSensor() {
+
+
+  if (FrontSensor < 50) {
+    Brake();
+    delay(2500);
+    //MoveForward();
+
+  }
+  else {
+    if (FrontSensor > 100 || FrontSensor > 51 )
+    {
+      //forward @ full speed
+      MoveForward();
+    }
+  }
+  if (isMovingForward == 1) {
+    if (FrontSensor > 51 && FrontSensor < 70) {
+      //If a object is in front of the sesnor it will go to the side which has the most space. then turn left.
+      if (RightSensor > LeftSensor) {
+        int StartTime = millis();
+        TurnRight(0);
+        int CurrentTime = millis();
+        TurnLeft(0);
+        delay(1000);
+        straight();
+        int ElapsedTime = CurrentTime - StartTime;
+        Brakeleds();
+        Serial.print("ElapsedTime");
+        Serial.println(ElapsedTime);
+      }
+      else {
+        int StartTime2 = millis();
+        TurnLeft(0);
+        int CurrentTime2 = millis();
+        int ElapsedTime2 = CurrentTime2 - StartTime2;
+      }
+      turnLoopCount = 1;
+    }
+  }
+}
+void ProcessRightSensor() {
+  if (RightSensor < 25) {
+    TurnLeft(0);
+  }
+  else {
+    if (RightSensor > 26) {
+      straight();
+    }
+  }
+
+}
+void ProcessLeftSensor() {
+  if (LeftSensor < 25) {
+    TurnRight(0);
+  }
+  else {
+    if (LeftSensor > 26) {
+      straight();
+    }
+  }
+
+}
+void TestServo() {
+  servo.write(0);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  delay(5000);
+
+  servo.write(45);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  delay(5000);
+
+  servo.write(90);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  delay(5000);
+
+  servo.write(135);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  delay(5000);
+
+  servo.write(180);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  delay(5000);
+
+  Serial.print(servo.read());
+  Serial.println("");
+
+  servo.write(0);
+}
